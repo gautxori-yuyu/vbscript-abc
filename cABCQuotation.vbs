@@ -1,0 +1,3 @@
+Class cQuotation
+
+End Class

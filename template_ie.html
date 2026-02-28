@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Procesador de Oportunidades</title>
+	<meta http-equiv="x-ua-compatible" content="ie=8">
+	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+
+	<script type="text/javascript">window.resizeTo(840, 560);</script>
+
+	<style type="text/css">
+		body, html {
+			width: 100%;
+			height: 100%;
+			margin: 0; /* margin -> border -> padding -> content */
+			padding: 0;
+			overflow: hidden;/* Evita que la ventana principal tenga scroll */
+			font-family: 'Segoe UI', Arial, sans-serif;
+			font-size: 10pt;
+			background-color: #f0f0f0;
+		}
+
+		/* --- Layout DIVs --- */
+		#top-panel {
+			height: 80px; /* Altura fija para la cabecera */
+			border-bottom: 1px solid #ccc;
+			background-color: #f0f0f0;
+			position: relative;
+		}
+		#header-buttons {
+			float: left; /* Flotamos a la izquierda */
+			width: 200px; /* Ancho fijo */
+			height: 100%;
+			padding: 4px;
+			box-sizing: border-box;
+			overflow: hidden;
+		}
+		#header-buttons button {
+			display: block;      /* Fuerza que cada botón esté en su propia línea */
+			width: 100%;         /* Ocupa todo el ancho del contenedor padre */
+			margin-bottom: 4px;  /* Separación reducida entre botones */
+		}
+		#header {
+			height: 100%;
+			padding: 4px;
+			background-color: #ffffdd; /* Yellowish */
+			font-weight: bold;
+			box-sizing: border-box;
+			overflow-y: auto; /* Scroll si el texto es largo */
+		}
+		#content-panel {
+			position: absolute;
+			top: 80px;      /* Comienza justo después del top-panel */
+			bottom: 100px;  /* Termina justo antes del log */
+			left: 0;
+			width: 100%;
+			overflow: hidden; /* Contendrá elementos internos y no debe desbordarse */
+		}
+		#tree {
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 25%;
+			height: 100%;
+			background-color: #fafafa; /* Gris muy claro para un contraste suave */
+			border-right: 1px solid #ccc;
+			box-sizing: border-box;
+			overflow-y: auto; /* Permitir scroll si el arbol es muy grande */
+		}
+		#right-container {
+			position: absolute;
+			top: 0;
+			left: 25%;
+			right: 0;
+			/* bottom: 150px; -> Eliminado. El padre (#content-panel) ya gestiona este espacio. */
+			height: 100%; /* Ocupa todo el alto disponible en content-panel */
+		}
+		#main {
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 50%;
+			background-color: #f8f8f8;
+			padding: 10px;
+			box-sizing: border-box;
+			overflow-y: auto;
+			border-bottom: 1px solid #ccc;
+			transition: background-color 0.5s ease;
+		}
+		#doc {
+			position: absolute;
+			top: 50%;
+			left: 0;
+			width: 100%;
+			bottom: 0;
+			background-color: #f8f8f8;
+			padding: 10px;
+			box-sizing: border-box;
+			overflow-y: auto;
+			transition: background-color 0.5s ease;
+		}
+		#log {
+			position: absolute;
+			bottom: 0;
+			left: 0;
+			width: 100%;
+			height: 100px;
+			border-top: 1px solid #666;
+			background-color: #888;
+			color: #eee;
+			padding: 10px;
+			box-sizing: border-box;
+			overflow-y: auto;/* Scroll vertical si el contenido excede la altura */
+			font-family: 'Consolas', 'Lucida Console', monospace;
+			font-size: 9pt;
+			white-space: pre-wrap;
+		}
+
+		button {
+			font-family: 'Segoe UI', Arial, sans-serif;
+			font-size: 10pt;
+			padding: 4px 6px;  /* superior+inferior, derecho+izquierdo */
+		}
+		
+		/* --- Spoiler Styles (Restored) --- */
+		.spoiler {
+			border: 1px solid #ddd;
+			margin: 5px 0;
+			background-color: #fff;
+		}
+		.spoiler-header {
+			background-color: #f7f7f7;
+			padding: 5px;
+			cursor: pointer;
+			font-weight: bold;
+			border-bottom: 1px solid #eee;
+		}
+		.spoiler-header:hover {
+			background-color: #efefef;
+		}
+		.spoiler-content {
+			padding: 5px;
+			border-top: 1px solid #ddd;
+		}
+	</style>
+	<style type="text/css">
+		#OpUL, #OpUL ul {list-style-type: none; font-family: 'Segoe UI Emoji', 'Segoe UI', Arial, sans-serif;}
+		#OpUL {margin: 0; padding: 5px;}
+		#OpUL ul { padding-left: 5px; margin: 0; } /* Indentación controlada */
+		#OpUL li { margin: 0; padding: 1px 0; padding-left: 5px; }
+
+		.nested {display: none;}
+		.active {display: block;}
+		
+		/* Wrapper para agrupar icono y texto y que reaccionen juntos */
+		.node-wrapper {
+			display: table; /* Cambiado a table para evitar saltos de línea */
+			width: 100%;
+			table-layout: fixed; /* Ayuda con el rendimiento y layout */
+			cursor: pointer;
+			box-sizing: border-box; /* IMPORTANTE: Evita que el padding sume al ancho 100% y provoque scroll horizontal */
+			padding: 1px 4px;
+			border: 1px solid transparent;
+			border-radius: 3px;
+		}
+		.node-wrapper:hover {
+			background-color: #e0e0e0;
+			border-color: #ccc;
+		}
+		
+		.icon {
+			display: table-cell;
+			width: 22px; /* Ancho fijo para la columna del icono */
+			text-align: left;
+			color: #000;
+			font-size: 12pt;
+			vertical-align: top; /* Alineación superior para textos largos */
+		}
+		.node-text { 
+			display: table-cell;
+			padding: 1px 0; /* Ajuste de padding */
+			vertical-align: top;
+			word-wrap: break-word; /* Romper palabras largas si es necesario */
+		}
+
+		/* --- Splitters (Resizers) --- */
+		.splitter {
+			position: absolute;
+			background-color: #f0f0f0; /* Match body background for a subtle look */
+			z-index: 1000;
+			font-size: 1px; /* IE fix */
+		}
+		.splitter:hover { background-color: #AEC6CF; } /* A nice blue on hover */
+		
+		#splitter-v {
+			top: 0; bottom: 0; left: 25%; width: 3px; cursor: col-resize;
+			border-left: 1px solid #ddd;
+			border-right: 1px solid #aaa;
+		}
+		#splitter-h {
+			left: 0; right: 0; top: 50%; height: 3px; cursor: row-resize;
+			border-top: 1px solid #ddd;
+			border-bottom: 1px solid #aaa;
+		}
+	</style>
+
+	<script type="text/javascript">
+		// Toggles the visibility of spoiler content
+		function toggleSpoiler(element) {
+			var content = element.nextElementSibling;
+			if (content.style.display === "block") {
+				content.style.display = "none";
+			} else {
+				content.style.display = "block";
+			}
+		}
+
+		// --- MsgBox Replacement (JScript for variable arguments) ---
+		function MsgBox(prompt, buttons, title) {
+			var btn = buttons === undefined ? 0 : buttons;
+			var tit = title === undefined ? "" : title;
+			
+			// Mapeo básico de botones:
+			// 4 = vbYesNo, 1 = vbOKCancel (tratado como Yes/No)
+			var isYesNo = ((btn & 4) === 4) || ((btn & 1) === 1);
+			
+			if (isYesNo) {
+				return HtaConfirm(prompt);
+			} else {
+				HtaAccept(prompt);
+				return 1; // vbOK
+			}
+		}
+
+		// --- Resize Logic ---
+		var isResizingV = false;
+		var isResizingH = false;
+
+		function startResizeV() { isResizingV = true; document.body.style.cursor = "col-resize"; }
+		function startResizeH() { isResizingH = true; document.body.style.cursor = "row-resize"; }
+
+		document.onmouseup = function() {
+			isResizingV = false;
+			isResizingH = false;
+			document.body.style.cursor = "default";
+		};
+
+		document.onmousemove = function(e) {
+			var ev = e || window.event;
+			
+			if (isResizingV) {
+				var containerWidth = document.getElementById("content-panel").clientWidth;
+				var newX = ev.clientX;
+				var percent = (newX / containerWidth) * 100;
+				
+				if (percent > 10 && percent < 90) {
+					document.getElementById("tree").style.width = percent + "%";
+					document.getElementById("right-container").style.left = percent + "%";
+					document.getElementById("splitter-v").style.left = percent + "%";
+				}
+				return false;
+			}
+			
+			if (isResizingH) {
+				var rightContainer = document.getElementById("right-container");
+				var topOffset = 80; // Altura del header
+				var relY = ev.clientY - topOffset;
+				var percent = (relY / rightContainer.clientHeight) * 100;
+				
+				if (percent > 10 && percent < 90) {
+					document.getElementById("main").style.height = percent + "%";
+					document.getElementById("doc").style.top = percent + "%";
+					document.getElementById("splitter-h").style.top = percent + "%";
+				}
+				return false;
+			}
+		};
+
+		document.onreadystatechange = function() {
+			if (document.readyState === "complete") {
+				// Buscamos el contenedor padre (aunque esté vacío)
+				var treeContainer = document.getElementById("tree");
+				
+				if (treeContainer) {
+					treeContainer.onclick = function(e) {
+						var ev = e || window.event;
+						var el = ev.target || ev.srcElement;
+		
+						// Navegamos hacia arriba hasta encontrar el wrapper (por si clicamos en el icono o texto)
+						var wrapper = null;
+						
+						while (el && el !== this) {
+							if (el.className && el.className.indexOf("node-wrapper") !== -1) {
+								wrapper = el;
+								break;
+							}
+							el = el.parentNode;
+						}
+
+						if (wrapper) {
+							// El LI es el padre del wrapper
+							var parentLi = wrapper.parentNode;
+							var children = parentLi.childNodes;
+							var iconSpan = wrapper.children[0]; // Asumimos que el icono es el primer hijo del wrapper
+							
+							for (var i = 0; i < children.length; i++) {
+								if (children[i].nodeName === "UL") {
+									var nestedUl = children[i];
+									// Alternar la clase 'active' y el icono
+									if (nestedUl.className.indexOf("active") > -1) {
+										// Si está activo, lo desactivamos quitando la clase 'active'
+										nestedUl.className = nestedUl.className.replace(" active", "");
+										if(iconSpan) iconSpan.innerText = "\uD83D\uDCC1"; // Closed folder
+									} else {
+										// Si no está activo, añadimos la clase 'active'
+										nestedUl.className += " active";
+										if(iconSpan) iconSpan.innerText = "\uD83D\uDCC2"; // Open folder
+									}
+									break;
+								}
+							}
+
+							// --- CONEXIÓN CON PANELES ---
+							// Llamamos a VBScript para mostrar detalles
+							try {
+								// Obtenemos el ID y Texto del nodo
+								// El span del texto es el segundo hijo (índice 1), el icono es el 0
+								var textSpan = wrapper.children[1];
+								var sId = textSpan.id;
+								var sText = textSpan.innerText;
+								var sTooltip = parentLi.title;
+								ShowNodeDetails(sId, sText, sTooltip);
+							} catch(err) { /* Ignorar si la función VBS no existe aún */ }
+						}
+					};
+				}
+			}
+		};
+	</script>
+</head>
+
+<body>
+	<!-- Top Panel Wrapper -->
+	<div id="top-panel">
+		<!-- Button Bar -->
+		<div id="header-buttons">
+			<button id="btnSeleccionar">Seleccionar Carpetas...</button>
+			<button id="btnProcesar" disabled>Iniciar Proceso</button>
+		</div>
+
+		<!-- Header: Informative Messages -->
+		<div id="header">
+		</div>
+	</div>
+	
+	<div id="content-panel">
+		<!-- Tree View -->
+		<div id="tree">
+			<ul id="OpUL">
+			</ul>
+		</div>
+		
+		<!-- Vertical Splitter -->
+		<div id="splitter-v" class="splitter" onmousedown="startResizeV()"></div>
+		
+		<!-- Right Side Panels -->
+		<div id="right-container">
+			<!-- Main Messages -->
+			<div id="main">
+			</div>
+			
+			<!-- Horizontal Splitter -->
+			<div id="splitter-h" class="splitter" onmousedown="startResizeH()"></div>
+			
+			<!-- Document-specific Messages -->
+			<div id="doc">
+			</div>
+		</div>
+	</div>
+
+		<!-- Log Area -->
+		<div id="log">
+			Registro de actividad del programa... <br/>
+		</div>
+
+	<!-- Modal Dialog (hidden by default) -->
+	<div id="modal-overlay" style="display:none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 10;"></div>
+	<div id="modal-dialog" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px; background-color: #fff; border: 2px solid #555; padding: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); z-index: 20;">
+		<p id="modal-prompt"></p>
+		<div id="modal-yesno-buttons" style="display: none; text-align: right;">
+			<button id="ModalYes">S&iacute;</button>
+			<button id="ModalNo">No</button>
+		</div>
+		<div id="modal-ok-button" style="display: none; text-align: right;">
+			<button id="ModalOk">Aceptar</button>
+		</div>
+	</div>
+</body>
+</html>
